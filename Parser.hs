@@ -1,42 +1,44 @@
 module Parser (parseToGrades)
        where
 
-import Data.Char
+import Text.Parsec
 
 -- | Parses grades into tuples that can be quickly converted to Grade
 -- objects.
 
-parseToGrades :: String -> [(String, String, String, [Int],Int)]
-parseToGrades =  parseToEntries . expandReplacements
 
--- Expands various replacements made in Lisp file
+parseToGrades :: String -> IO [(String, String, String, [Int],Int)]
+parseToGrades str
+  = do x <- printErrorOrReturn (parse allButEnd "" str)
+       let y = makeReplacements x
+       z <- breakUp y
+       return $ toGrades z
 
-expandReplacements :: String -> String
-expandReplacements string =
-  replace (countReplacements string) string
+getGradePortionOfFile :: String -> IO String
+getGradePortionOfFile str = printErrorOrReturn (parse allButEnd "" str)
 
-countReplacements = length . (filter isReplacement) . words . filter (`notElem`"()")
-  where isReplacement str =
-          head str == '#'
-          && tail str == '#'
-          && all isDigit (init $ tail str)
+allButEnd =
+  do spaces
+     openParen
+     result <- readParen'd
+     many parenCompound
+     closeParen
+     return result
 
+openParen = char '('
 
-                 
+closeParen = char ')'
 
--- Parses string into grades
+readParen'd =
+  do openParen
+     result <- fmap concat $ many parenCompound
+     closeParen
+     return $ "("++result++")"
 
-parseToEntries = convert . (map removeOuterParens) . (partition 0 "") . takeParens . removeOuterParens
-  where removeOuterParens = tail . init
-        partition n _ []
-          | n == 0 = []
-          | otherwise = error $ "Parentheses in lisp database are unbalanced!"
-        partition n l (c:xs) =
-          case (c,n)
-          of (' ',0) -> (reverse l) : partition n [] xs
-             ('(',_) -> partition (n+1) (c:l) xs
-             (')',_) -> partition (n-1) (c:l) xs
-             _ -> partition n (c:l) xs
-        convert = 
-        
--- | Create the file contents with the grades appended.
+parenCompound = many1 (noneOf "()") <|> readParen'd
+
+printErrorOrReturn :: Either ParseError String -> IO String
+printErrorOrReturn result =
+     case result of
+       Left err -> error $ "Parse failed: Exception was ++ \"" ++ show err ++ "\""
+       Right xs -> return xs
