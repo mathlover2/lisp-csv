@@ -26,7 +26,9 @@ allButEnd =
      return result
 
 openParen = char '('
-
+sharp = char '#'
+equalsSign = char '='
+quote = char '"'
 closeParen = char ')'
 
 readParen'd =
